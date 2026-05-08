@@ -7,7 +7,7 @@ from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.database import Base, SessionLocal, Weather, engine
+from app.database import Base, Weather, engine, get_db
 
 TEMPLATES = Path(__file__).parent / "templates"
 DATA_DIR = Path("/app/csvdata")
@@ -48,44 +48,40 @@ def get_file(name: str):
 
 @app.get("/datasets")
 def list_datasets():
-    db = SessionLocal()
-    rows = db.query(Weather.dataset).distinct().all()
-    db.close()
-    return [r[0] for r in rows]
+    with get_db() as db:
+        rows = db.query(Weather.dataset).distinct().all()
+        return [r[0] for r in rows]
 
 
 @app.get("/datasets/{name}")
 def get_dataset(name: str):
-    db = SessionLocal()
-    rows = db.query(Weather).filter(Weather.dataset == name).order_by(Weather.date).all()
-    db.close()
-    return [{"date": r.date, "temp_c": r.temp_c, "humidity": r.humidity} for r in rows]
+    with get_db() as db:
+        rows = db.query(Weather).filter(Weather.dataset == name).order_by(Weather.date).all()
+        return [r.to_dict() for r in rows]
 
 
 @app.post("/upload")
 async def upload_csv(file: UploadFile = File(...), dataset: str = Form(...)):
     content = await file.read()
     reader = csv.DictReader(io.StringIO(content.decode()))
-    db = SessionLocal()
-    count = 0
-    for row in reader:
-        db.add(Weather(
-            dataset=dataset,
-            date=row["date"],
-            temp_c=float(row["temp_c"]),
-            humidity=float(row["humidity"]),
-        ))
-        count += 1
-    db.commit()
-    db.close()
+    with get_db() as db:
+        count = 0
+        for row in reader:
+            db.add(Weather(
+                dataset=dataset,
+                date=row["date"],
+                temp_c=float(row["temp_c"]),
+                humidity=float(row["humidity"]),
+            ))
+            count += 1
+        db.commit()
     return {"inserted": count}
 
 
 @app.get("/export")
 def export_csv():
-    db = SessionLocal()
-    rows = db.query(Weather).all()
-    db.close()
+    with get_db() as db:
+        rows = db.query(Weather).all()
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["dataset", "date", "temp_c", "humidity"])

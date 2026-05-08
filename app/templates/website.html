@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CSV → SQLite</title>
 <script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
-<script src="/static/temperature_chart.js"></script>
-<script src="/static/humidity_chart.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -127,127 +125,13 @@
     <div class="chart" id="chart-humidity"></div>
   </div>
 </div>
-<script>
-const filePicker=document.getElementById('filePicker'), fileSelect=document.getElementById('fileSelect'),
-  pickBtn=document.getElementById('pickBtn'), orDivider=document.getElementById('orDivider'),
-  drop=document.getElementById('drop'), fi=document.getElementById('file'),
-  thead=document.getElementById('thead'), tbody=document.getElementById('tbody'),
-  btn=document.getElementById('upload'), fname=document.getElementById('fname'),
-  status=document.getElementById('status'), chartsDiv=document.getElementById('charts'),
-  tabsDiv=document.getElementById('tabs'), toggle=document.getElementById('toggle'),
-  tableWrap=document.getElementById('tableWrap');
-let selectedFile=null, parsedData=null;
 
-// collapse toggle
-function toggleTable(){
-  toggle.classList.toggle('collapsed');
-  tableWrap.classList.toggle('collapsed');
-}
+<!-- chart scripts (must load before upload.js which calls them) -->
+<script src="/static/temperature_chart.js"></script>
+<script src="/static/humidity_chart.js"></script>
 
-// drop zone
-drop.addEventListener('click',()=>fi.click());
-drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('over')});
-drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
-drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over');handle(e.dataTransfer.files[0])});
-fi.addEventListener('change',()=>handle(fi.files[0]));
-
-function parseCSV(text){
-  const lines=text.trim().split('\n').map(l=>l.split(','));
-  return {headers:lines[0].map(h=>h.trim()), rows:lines.slice(1).map(r=>r.map(c=>c.trim()))};
-}
-
-function showTable(headers, rows){
-  thead.innerHTML='<tr>'+headers.map(h=>'<th>'+h+'</th>').join('')+'</tr>';
-  tbody.innerHTML=rows.map(r=>'<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('');
-  toggle.style.display='block';
-  toggle.classList.remove('collapsed');
-  tableWrap.classList.remove('collapsed');
-}
-
-function showCharts(headers, rows){
-  const di=headers.indexOf('date'), ti=headers.indexOf('temp_c'), hi=headers.indexOf('humidity');
-  if(di<0||ti<0||hi<0){chartsDiv.style.display='none';return;}
-  const dates=[], temps=[], humidities=[];
-  rows.forEach(r=>{
-    dates.push(r[di]); temps.push(parseFloat(r[ti]));
-    humidities.push(parseFloat(r[hi]));
-  });
-  chartsDiv.style.display='block';
-  renderTemperatureChart(dates, temps);
-  renderHumidityChart(dates, humidities);
-}
-
-function handle(f){
-  if(!f)return; selectedFile=f; fname.textContent=f.name;
-  const r=new FileReader();
-  r.onload=e=>{
-    const {headers,rows}=parseCSV(e.target.result);
-    showTable(headers,rows); showCharts(headers,rows);
-    btn.style.display='inline-block'; status.textContent='';
-  }; r.readAsText(f);
-}
-
-// upload
-btn.addEventListener('click',async()=>{
-  const name=selectedFile.name.replace(/\.csv$/i,'');
-  const fd=new FormData(); fd.append('file',selectedFile); fd.append('dataset',name);
-  status.textContent='uploading...';
-  const res=await fetch('/upload',{method:'POST',body:fd});
-  const j=await res.json();
-  status.textContent='inserted '+j.inserted+' row(s) into database';
-  loadDatasets();
-});
-
-// tabs - load datasets from DB
-async function loadDatasets(){
-  const res=await fetch('/datasets');
-  const datasets=await res.json();
-  if(!datasets.length){tabsDiv.style.display='none';return;}
-  tabsDiv.style.display='flex';
-  tabsDiv.innerHTML=datasets.map(d=>'<button class="tab" data-name="'+d+'">'+d+'</button>').join('');
-  tabsDiv.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>selectDataset(t.dataset.name)));
-}
-
-async function selectDataset(name){
-  tabsDiv.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.name===name));
-  const res=await fetch('/datasets/'+encodeURIComponent(name));
-  const data=await res.json();
-  if(!data.length)return;
-  const headers=Object.keys(data[0]);
-  const rows=data.map(r=>headers.map(h=>String(r[h])));
-  showTable(headers,rows); showCharts(headers,rows);
-  chartsDiv.style.display='block';
-  status.textContent='showing '+data.length+' rows from database';
-}
-
-// file picker — load available CSV files from /files
-async function loadFiles(){
-  const res=await fetch('/files');
-  const files=await res.json();
-  if(!files.length)return;
-  filePicker.style.display='block';
-  orDivider.style.display='block';
-  fileSelect.innerHTML='<option value="">-- select a file --</option>'+
-    files.map(f=>'<option value="'+f+'">'+f+'</option>').join('');
-}
-
-pickBtn.addEventListener('click',async()=>{
-  const name=fileSelect.value;
-  if(!name)return;
-  const res=await fetch('/files/'+encodeURIComponent(name));
-  const text=await res.text();
-  const {headers,rows}=parseCSV(text);
-  showTable(headers,rows); showCharts(headers,rows);
-
-  // create a File object so the upload button works
-  selectedFile=new File([text],name,{type:'text/csv'});
-  fname.textContent=name;
-  btn.style.display='inline-block'; status.textContent='';
-});
-
-// load existing datasets on page load
-loadDatasets();
-loadFiles();
-</script>
+<!-- app logic -->
+<script src="/static/upload.js"></script>
+<script src="/static/datasets.js"></script>
 </body>
 </html>

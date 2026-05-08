@@ -36,9 +36,11 @@ app/
 ├── server.py                # The routes — what the server can do
 ├── static/
 │   ├── temperature_chart.js # Draws the temperature line chart (Plotly.js)
-│   └── humidity_chart.js    # Draws the humidity bar chart (Plotly.js)
+│   ├── humidity_chart.js    # Draws the humidity bar chart (Plotly.js)
+│   ├── upload.js            # Drop zone, file picker, CSV parsing, upload logic
+│   └── datasets.js          # Tabs — loading saved datasets from the database
 └── templates/
-    └── website.html         # The page you see in the browser
+    └── website.html         # Just the HTML structure and CSS (no logic)
 ```
 
 ---

@@ -18,23 +18,12 @@ To stop: `docker compose down` (keeps data) or `docker compose down -v` (wipes d
 
 ```
 csv-sqlite-demo/
-├── docker-compose.yml              # Runs the app in a container with a persistent volume
-├── Dockerfile                      # Builds the Python image (installs dependencies, copies code)
-├── requirements.txt                # Python packages: fastapi, sqlalchemy, uvicorn, python-multipart
-├── app/
-│   ├── server.py                   # The backend — all the routes and the database model
-│   ├── static/
-│   │   ├── temperature_chart.js    # Draws the temperature line chart (Plotly.js)
-│   │   └── humidity_chart.js       # Draws the humidity bar chart (Plotly.js)
-│   └── templates/
-│       └── website.html            # The page you see in the browser
-├── data/
-│   ├── sample_data.csv             # 30 days of fake winter weather
-│   ├── spring_data.csv             # 30 days of fake spring weather
-│   └── summer_data.csv             # 30 days of fake summer weather
-└── scripts/
-    ├── seed_database.py            # Uploads sample_data.csv into the running app
-    └── test_server_endpoints.py    # Tests every endpoint to make sure it works
+├── docker-compose.yml   # Runs the app in a container with a persistent volume
+├── Dockerfile           # Builds the Python image (installs dependencies, copies code)
+├── requirements.txt     # Python packages: fastapi, sqlalchemy, uvicorn, python-multipart
+├── app/                 # The server, website, and chart code
+├── data/                # CSV files you can upload
+└── scripts/             # Seed and test scripts
 ```
 
 ---

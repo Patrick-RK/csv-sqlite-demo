@@ -35,11 +35,13 @@ app/
 ├── database.py              # Database connection + table definition (the ORM model)
 ├── server.py                # The routes — what the server can do
 ├── static/
-│   ├── temperature_chart.js # Draws the temperature line chart (Plotly.js)
-│   ├── humidity_chart.js    # Draws the humidity bar chart (Plotly.js)
-│   ├── styles.css           # All the CSS styling
-│   ├── upload.js            # Drop zone, file picker, CSV parsing, upload logic
-│   └── datasets.js          # Tabs — loading saved datasets from the database
+│   ├── css/
+│   │   └── styles.css           # All the CSS styling
+│   └── js/
+│       ├── temperature_chart.js # Draws the temperature line chart (Plotly.js)
+│       ├── humidity_chart.js    # Draws the humidity bar chart (Plotly.js)
+│       ├── upload.js            # Drop zone, file picker, CSV parsing, upload logic
+│       └── datasets.js          # Tabs — loading saved datasets from the database
 └── templates/
     └── website.html         # Just the HTML structure (no styles, no logic)
 ```

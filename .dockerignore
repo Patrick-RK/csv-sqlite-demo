@@ -1,0 +1,10 @@
+.git
+.gitignore
+.dockerignore
+.DS_Store
+__pycache__
+*.pyc
+*.db
+data/
+scripts/
+README.md

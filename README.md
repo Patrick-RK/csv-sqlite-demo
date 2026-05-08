@@ -14,111 +14,160 @@ To stop: `docker compose down` (keeps data) or `docker compose down -v` (wipes d
 
 ---
 
-A minimal web app that lets you upload CSV files, store them in a SQLite database, and visualise the data with interactive charts.
-
-## What's in the box
+## The pieces
 
 ```
-csv-postgres-demo/
-├── docker-compose.yml     # Defines the single container + volume
-├── Dockerfile             # Builds the Python app image
-├── requirements.txt       # Python dependencies
+csv-sqlite-demo/
+├── docker-compose.yml              # Runs the app in a container with a persistent volume
+├── Dockerfile                      # Builds the Python image (installs dependencies, copies code)
+├── requirements.txt                # Python packages: fastapi, sqlalchemy, uvicorn, python-multipart
 ├── app/
-│   ├── server.py          # FastAPI backend (routes + database model)
+│   ├── server.py                   # The backend — all the routes and the database model
 │   ├── static/
-│   │   ├── temperature_chart.js  # Plotly temperature line chart
-│   │   └── humidity_chart.js     # Plotly humidity bar chart
+│   │   ├── temperature_chart.js    # Draws the temperature line chart (Plotly.js)
+│   │   └── humidity_chart.js       # Draws the humidity bar chart (Plotly.js)
 │   └── templates/
-│       └── website.html   # Frontend (HTML + CSS)
+│       └── website.html            # The page you see in the browser
 ├── data/
-│   ├── sample_data.csv    # 30 days of fake winter weather
-│   ├── spring_data.csv    # 30 days of fake spring weather
-│   └── summer_data.csv    # 30 days of fake summer weather
+│   ├── sample_data.csv             # 30 days of fake winter weather
+│   ├── spring_data.csv             # 30 days of fake spring weather
+│   └── summer_data.csv             # 30 days of fake summer weather
 └── scripts/
-    ├── seed_database.py         # Uploads sample.csv into the running app
-    └── test_server_endpoints.py # End-to-end test script
+    ├── seed_database.py            # Uploads sample_data.csv into the running app
+    └── test_server_endpoints.py    # Tests every endpoint to make sure it works
 ```
 
-## How it works — step by step
+---
 
-### Step 1: You run `docker compose up`
+## The server (`app/server.py`)
 
-Docker reads `docker-compose.yml` and does two things:
-
-1. **Builds an image** from the `Dockerfile` — installs Python + dependencies + your code
-2. **Creates a volume** called `dbdata` — a persistent folder that survives container restarts
+The server is a Python app built with **FastAPI**. When it starts, it creates a SQLite database file (`weather.db`) with one table:
 
 ```
-┌─────────────────────────────────────────────┐
-│  docker compose up --build                  │
-│                                             │
-│  1. Read Dockerfile                         │
-│  2. Install Python 3.12                     │
-│  3. pip install fastapi, sqlalchemy, etc.   │
-│  4. Copy app/ into the image                │
-│  5. Start uvicorn server on port 8000       │
-│  6. Map port 8001 (your machine) → 8000     │
-│  7. Mount volume dbdata → /app/data/        │
-└─────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│  weather table                                   │
+├──────┬──────────┬────────────┬────────┬──────────┤
+│  id  │ dataset  │    date    │ temp_c │ humidity │
+├──────┼──────────┼────────────┼────────┼──────────┤
+│  1   │ sample   │ 2026-01-01 │  3.0   │  78.0    │
+│  2   │ sample   │ 2026-01-02 │  1.0   │  82.0    │
+│ ...  │  ...     │    ...     │  ...   │  ...     │
+└──────┴──────────┴────────────┴────────┴──────────┘
 ```
 
-### Step 2: The app starts up
+The `dataset` column lets you store multiple CSV uploads separately (e.g. "winter", "spring", "summer") and switch between them.
 
-When the FastAPI app boots, it runs this line:
+### What the server can do
 
-```python
-Base.metadata.create_all(engine)
+| Route | What it does |
+|-------|-------------|
+| `GET /` | Serve the website |
+| `GET /files` | List available CSV files in the data folder |
+| `GET /files/{name}` | Return the contents of a CSV file |
+| `POST /upload` | Upload a CSV and insert it into the database |
+| `GET /datasets` | List all dataset names in the database |
+| `GET /datasets/{name}` | Get all rows for one dataset |
+| `GET /export` | Download the entire database as a CSV |
+
+---
+
+### `GET /` — Serve the website
+
+Reads `app/templates/website.html` from disk and sends it to your browser.
+
+---
+
+### `GET /files` — List available CSV files
+
+Returns a list of every `.csv` file in the `data/` folder. The website uses this to populate the file picker dropdown.
+
+```
+Request:   GET /files
+Response:  ["sample_data.csv", "spring_data.csv", "summer_data.csv"]
 ```
 
-This creates the `weather` table in `/app/data/weather.db` if it doesn't already exist:
+---
+
+### `GET /files/{name}` — Get a CSV file's contents
+
+Returns the raw CSV text. The website uses this to preview a file before uploading.
 
 ```
-┌──────────────────────────────────┐
-│  weather table                   │
-├──────┬─────────┬────────┬────────┤
-│  id  │ dataset │  date  │ temp_c │ humidity │
-├──────┼─────────┼────────┼────────┤
-│  1   │ sample  │ 2026.. │  3.0   │  78.0    │
-│  2   │ sample  │ 2026.. │  1.0   │  82.0    │
-│ ...  │  ...    │  ...   │  ...   │  ...     │
-└──────┴─────────┴────────┴────────┘
+Request:   GET /files/sample_data.csv
+Response:  date,temp_c,humidity
+           2026-01-01,3,78
+           2026-01-02,1,82
+           ...
 ```
 
-### Step 3: You open the browser
+---
 
-Go to `http://localhost:8001`. The browser loads `index.html` which gives you:
+### `POST /upload` — Upload a CSV into the database
 
-- A **drop zone** to pick or drag a CSV file
-- A **collapsible data table** showing a preview of the CSV
-- **Interactive charts** (powered by Plotly.js) — hover, zoom, pan
-- **Tabs** to switch between previously uploaded datasets
+Takes a CSV file and a dataset name. Parses every row and inserts it into the `weather` table.
 
-### Step 4: You upload a CSV
+```
+Request:
+  POST /upload
+  file = sample_data.csv
+  dataset = "winter"
 
-Here's what happens when you click "upload to database":
+What happens inside:
+  1. FastAPI receives the file
+  2. Python's csv.DictReader parses each row
+  3. SQLAlchemy creates a Weather object per row
+  4. All rows are inserted in one transaction
+  5. The transaction is committed
+
+Response:
+  {"inserted": 30}
+```
+
+The flow looks like this:
 
 ```
 ┌──────────┐       POST /upload        ┌──────────┐       INSERT INTO       ┌──────────┐
 │          │  ───────────────────────►  │          │  ──────────────────►   │          │
-│ Browser  │     (CSV file + name)     │ FastAPI  │    weather table       │  SQLite  │
+│ Browser  │     (CSV file + name)     │  Server  │    weather table       │  SQLite  │
 │          │  ◄───────────────────────  │          │  ◄──────────────────   │  (.db)   │
 │          │    {"inserted": 30}       │          │       done             │          │
 └──────────┘                           └──────────┘                        └──────────┘
 ```
 
-1. Browser reads the CSV file and sends it as a `POST` request
-2. FastAPI parses each row with Python's `csv.DictReader`
-3. SQLAlchemy inserts each row into the `weather` table
-4. Response goes back: `{"inserted": 30}`
+---
 
-### Step 5: You view a saved dataset
+### `GET /datasets` — List all dataset names
 
-When you click a tab:
+Returns every unique dataset name that's been uploaded. The website uses this to render the tabs.
 
 ```
-┌──────────┐     GET /datasets/sample   ┌──────────┐    SELECT * FROM      ┌──────────┐
+Request:   GET /datasets
+SQL:       SELECT DISTINCT dataset FROM weather;
+Response:  ["winter", "spring", "summer"]
+```
+
+---
+
+### `GET /datasets/{name}` — Get all rows for one dataset
+
+Returns every row for a dataset as JSON, ordered by date. The website uses this to build the table and charts when you click a tab.
+
+```
+Request:   GET /datasets/winter
+SQL:       SELECT * FROM weather WHERE dataset = 'winter' ORDER BY date;
+Response:  [
+             {"date": "2026-01-01", "temp_c": 3.0, "humidity": 78.0},
+             {"date": "2026-01-02", "temp_c": 1.0, "humidity": 82.0},
+             ...
+           ]
+```
+
+The flow:
+
+```
+┌──────────┐    GET /datasets/winter    ┌──────────┐    SELECT * FROM      ┌──────────┐
 │          │  ───────────────────────►   │          │  ──────────────────►  │          │
-│ Browser  │                            │ FastAPI  │    WHERE dataset=     │  SQLite  │
+│ Browser  │                            │  Server  │    WHERE dataset=     │  SQLite  │
 │          │  ◄───────────────────────   │          │  ◄──────────────────  │  (.db)   │
 │          │      JSON array            │          │      rows             │          │
 └──────────┘                            └──────────┘                       └──────────┘
@@ -128,7 +177,26 @@ When you click a tab:
               interactive charts
 ```
 
+---
+
+### `GET /export` — Download everything as CSV
+
+Returns the entire `weather` table as a downloadable `.csv` file.
+
+```
+Request:   GET /export
+SQL:       SELECT * FROM weather;
+Response:  dataset,date,temp_c,humidity
+           winter,2026-01-01,3.0,78.0
+           winter,2026-01-02,1.0,82.0
+           ...
+```
+
+---
+
 ## Why the volume matters
+
+The SQLite database lives inside the container at `/app/data/weather.db`. Without a volume, that file disappears when the container is removed. The volume keeps it alive:
 
 ```
 Without volume:                          With volume:
@@ -142,114 +210,14 @@ docker compose down                     docker compose down
   → container deleted                     → container deleted
   → weather.db GONE                       → volume STILL EXISTS
                                           → data survives
-docker compose up
-  → fresh container                     docker compose up
-  → empty database                        → new container
-                                          → mounts same volume
-                                          → data is still there
+
+docker compose up                       docker compose up
+  → empty database                        → same data still there
 ```
 
-The volume (`dbdata`) is a folder managed by Docker that exists **outside** the container. When the container is deleted and recreated, the volume stays. Your data only gets wiped if you explicitly run `docker compose down -v` (the `-v` flag removes volumes).
-
-## API endpoints
-
-### `GET /` — Serve the web page
-
-Returns the `website.html` file. This is the page you see when you open `http://localhost:8001` in your browser.
-
-```
-Browser: GET /
-Server:  reads app/templates/website.html from disk
-         returns it as HTML
-Browser: renders the page
-```
+`docker compose down` keeps the volume. `docker compose down -v` wipes it.
 
 ---
-
-### `POST /upload` — Upload a CSV into the database
-
-Accepts a CSV file and a dataset name. Parses every row and inserts it into the `weather` table.
-
-**Form fields:**
-- `file` — the CSV file (must have columns: `date`, `temp_c`, `humidity`)
-- `dataset` — a name to group these rows under (e.g. `"january"`)
-
-```
-Request:
-  POST /upload
-  file=sample.csv
-  dataset=january
-
-What happens:
-  1. FastAPI receives the file
-  2. Python's csv.DictReader parses each row
-  3. SQLAlchemy creates a Weather object per row
-  4. All rows are inserted into the weather table in one transaction
-  5. The transaction is committed
-
-Response:
-  {"inserted": 30}
-```
-
----
-
-### `GET /datasets` — List all dataset names
-
-Returns a JSON array of every unique dataset name in the database. This is what populates the tabs in the UI.
-
-```
-Request:
-  GET /datasets
-
-SQL that runs:
-  SELECT DISTINCT dataset FROM weather;
-
-Response:
-  ["january", "february", "march"]
-```
-
----
-
-### `GET /datasets/{name}` — Get all rows for one dataset
-
-Returns every row belonging to a dataset, ordered by date. The frontend uses this to build the table and charts when you click a tab.
-
-```
-Request:
-  GET /datasets/january
-
-SQL that runs:
-  SELECT * FROM weather
-  WHERE dataset = 'january'
-  ORDER BY date;
-
-Response:
-  [
-    {"date": "2026-01-01", "temp_c": 3.0, "humidity": 78.0},
-    {"date": "2026-01-02", "temp_c": 1.0, "humidity": 82.0},
-    ...
-  ]
-```
-
----
-
-### `GET /export` — Download everything as CSV
-
-Returns the entire `weather` table as a downloadable CSV file. Includes all datasets.
-
-```
-Request:
-  GET /export
-
-SQL that runs:
-  SELECT * FROM weather;
-
-Response (CSV file download):
-  dataset,date,temp_c,humidity
-  january,2026-01-01,3.0,78.0
-  january,2026-01-02,1.0,82.0
-  ...
-```
 
 ## Tech stack
 

@@ -28,9 +28,24 @@ csv-sqlite-demo/
 
 ---
 
-## The server (`app/server.py`)
+## The app folder
 
-The server is a Python app built with **FastAPI**. When it starts, it creates a SQLite database file (`weather.db`) with one table:
+```
+app/
+├── database.py              # Database connection + table definition (the ORM model)
+├── server.py                # The routes — what the server can do
+├── static/
+│   ├── temperature_chart.js # Draws the temperature line chart (Plotly.js)
+│   └── humidity_chart.js    # Draws the humidity bar chart (Plotly.js)
+└── templates/
+    └── website.html         # The page you see in the browser
+```
+
+---
+
+## The database (`app/database.py`)
+
+This file defines the connection to SQLite and what the table looks like:
 
 ```
 ┌──────────────────────────────────────────────────┐
@@ -45,6 +60,12 @@ The server is a Python app built with **FastAPI**. When it starts, it creates a 
 ```
 
 The `dataset` column lets you store multiple CSV uploads separately (e.g. "winter", "spring", "summer") and switch between them.
+
+---
+
+## The server (`app/server.py`)
+
+The server is a Python app built with **FastAPI**. It imports the database model from `database.py` and uses it to read/write data. When it starts, it creates the table if it doesn't exist yet.
 
 ### What the server can do
 

@@ -6,7 +6,6 @@
 git clone https://github.com/Patrick-RK/csv-sqlite-demo.git
 cd csv-sqlite-demo
 docker compose up --build -d
-pip install requests
 python scripts/seed_database.py
 open http://localhost:8001
 ```

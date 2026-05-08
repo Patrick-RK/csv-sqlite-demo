@@ -1,5 +1,20 @@
 # CSV → SQLite Demo
 
+## Quick start
+
+```bash
+git clone https://github.com/Patrick-RK/csv-sqlite-demo.git
+cd csv-sqlite-demo
+docker compose up --build -d
+pip install requests
+python scripts/seed_database.py
+open http://localhost:8001
+```
+
+To stop: `docker compose down` (keeps data) or `docker compose down -v` (wipes data).
+
+---
+
 A minimal web app that lets you upload CSV files, store them in a SQLite database, and visualise the data with interactive charts.
 
 ## What's in the box
@@ -136,29 +151,6 @@ docker compose up
 ```
 
 The volume (`dbdata`) is a folder managed by Docker that exists **outside** the container. When the container is deleted and recreated, the volume stays. Your data only gets wiped if you explicitly run `docker compose down -v` (the `-v` flag removes volumes).
-
-## Quick start
-
-```bash
-# 1. Start everything
-docker compose up --build -d
-
-# 2. Seed it with sample data
-pip install requests
-python scripts/seed_database.py
-
-# 3. Open the app
-open http://localhost:8001
-
-# 4. Run the test to verify everything works
-python scripts/test_server_endpoints.py
-
-# 5. Stop (keeps data)
-docker compose down
-
-# 6. Stop and wipe data
-docker compose down -v
-```
 
 ## API endpoints
 

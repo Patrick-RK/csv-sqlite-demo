@@ -1,32 +1,16 @@
 import csv
 import io
-import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import create_engine, Column, Integer, String, Float
-from sqlalchemy.orm import declarative_base, sessionmaker
 
-DATABASE_URL = "sqlite:///data/weather.db"
-
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(bind=engine)
-Base = declarative_base()
+from app.database import Base, SessionLocal, Weather, engine
 
 TEMPLATES = Path(__file__).parent / "templates"
 DATA_DIR = Path("/app/csvdata")
-
-
-class Weather(Base):
-    __tablename__ = "weather"
-    id = Column(Integer, primary_key=True)
-    dataset = Column(String, nullable=False)
-    date = Column(String, nullable=False)
-    temp_c = Column(Float, nullable=False)
-    humidity = Column(Float, nullable=False)
 
 
 @asynccontextmanager
@@ -35,7 +19,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="CSV-Postgres Demo", lifespan=lifespan)
+app = FastAPI(title="CSV-SQLite Demo", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
 

@@ -32,25 +32,29 @@ csv-sqlite-demo/
 
 ```
 app/
-├── database.py              # Database connection + table definition (the ORM model)
-├── server.py                # The routes — what the server can do
+├── database.py          # Database connection, table definition, helper functions
+├── server.py            # The routes — what the server can do
 ├── static/
 │   ├── css/
-│   │   └── styles.css           # All the CSS styling
+│   │   └── styles.css           # All the styling
 │   └── js/
-│       ├── temperature_chart.js # Draws the temperature line chart (Plotly.js)
-│       ├── humidity_chart.js    # Draws the humidity bar chart (Plotly.js)
-│       ├── upload.js            # Drop zone, file picker, CSV parsing, upload logic
+│       ├── temperature_chart.js # Temperature line chart
+│       ├── humidity_chart.js    # Humidity bar chart
+│       ├── upload.js            # Drop zone, file picker, CSV parsing, upload
 │       └── datasets.js          # Tabs — loading saved datasets from the database
 └── templates/
-    └── website.html         # Just the HTML structure (no styles, no logic)
+    └── website.html     # Just the HTML structure (no styles, no logic)
 ```
 
 ---
 
 ## The database (`app/database.py`)
 
-This file defines the connection to SQLite and what the table looks like:
+This file sets up three things:
+
+**1. The connection** — points SQLAlchemy at a SQLite file (`weather.db`).
+
+**2. The table** — defines what a row looks like:
 
 ```
 ┌──────────────────────────────────────────────────┐
@@ -58,21 +62,23 @@ This file defines the connection to SQLite and what the table looks like:
 ├──────┬──────────┬────────────┬────────┬──────────┤
 │  id  │ dataset  │    date    │ temp_c │ humidity │
 ├──────┼──────────┼────────────┼────────┼──────────┤
-│  1   │ sample   │ 2026-01-01 │  3.0   │  78.0    │
-│  2   │ sample   │ 2026-01-02 │  1.0   │  82.0    │
+│  1   │ winter   │ 2026-01-01 │  3.0   │  78.0    │
+│  2   │ winter   │ 2026-01-02 │  1.0   │  82.0    │
 │ ...  │  ...     │    ...     │  ...   │  ...     │
 └──────┴──────────┴────────────┴────────┴──────────┘
 ```
 
-The `dataset` column lets you store multiple CSV uploads separately (e.g. "winter", "spring", "summer") and switch between them.
+The `dataset` column groups rows together so you can upload multiple CSVs (e.g. "winter", "spring", "summer") and switch between them.
+
+**3. Two helpers:**
+- `get_db()` — opens a database session and automatically closes it when done. Every route in the server uses this instead of manually opening/closing connections.
+- `Weather.to_dict()` — converts a row into a Python dictionary so the server can return it as JSON.
 
 ---
 
 ## The server (`app/server.py`)
 
-The server is a Python app built with **FastAPI**. It imports the database model from `database.py` and uses it to read/write data. When it starts, it creates the table if it doesn't exist yet.
-
-### What the server can do
+A Python app built with **FastAPI**. It imports the model and helpers from `database.py`, and exposes these routes:
 
 | Route | What it does |
 |-------|-------------|
@@ -88,13 +94,13 @@ The server is a Python app built with **FastAPI**. It imports the database model
 
 ### `GET /` — Serve the website
 
-Reads `app/templates/website.html` from disk and sends it to your browser.
+Reads `website.html` from disk and sends it to the browser.
 
 ---
 
 ### `GET /files` — List available CSV files
 
-Returns a list of every `.csv` file in the `data/` folder. The website uses this to populate the file picker dropdown.
+Returns the names of every `.csv` in the `data/` folder. The website uses this for the file picker dropdown.
 
 ```
 Request:   GET /files
@@ -119,7 +125,7 @@ Response:  date,temp_c,humidity
 
 ### `POST /upload` — Upload a CSV into the database
 
-Takes a CSV file and a dataset name. Parses every row and inserts it into the `weather` table.
+Takes a CSV file and a dataset name, parses every row, and inserts it into the `weather` table.
 
 ```
 Request:
@@ -127,18 +133,16 @@ Request:
   file = sample_data.csv
   dataset = "winter"
 
-What happens inside:
+What happens:
   1. FastAPI receives the file
-  2. Python's csv.DictReader parses each row
-  3. SQLAlchemy creates a Weather object per row
+  2. csv.DictReader parses each row
+  3. Each row becomes a Weather object
   4. All rows are inserted in one transaction
   5. The transaction is committed
 
 Response:
   {"inserted": 30}
 ```
-
-The flow looks like this:
 
 ```
 ┌──────────┐       POST /upload        ┌──────────┐       INSERT INTO       ┌──────────┐
@@ -153,7 +157,7 @@ The flow looks like this:
 
 ### `GET /datasets` — List all dataset names
 
-Returns every unique dataset name that's been uploaded. The website uses this to render the tabs.
+Returns every unique dataset name. The website uses this to render the tabs.
 
 ```
 Request:   GET /datasets
@@ -165,7 +169,7 @@ Response:  ["winter", "spring", "summer"]
 
 ### `GET /datasets/{name}` — Get all rows for one dataset
 
-Returns every row for a dataset as JSON, ordered by date. The website uses this to build the table and charts when you click a tab.
+Returns every row for a dataset as JSON, ordered by date. The website uses this to build the table and charts when you click a tab. Each row is converted using `Weather.to_dict()`.
 
 ```
 Request:   GET /datasets/winter
@@ -176,8 +180,6 @@ Response:  [
              ...
            ]
 ```
-
-The flow:
 
 ```
 ┌──────────┐    GET /datasets/winter    ┌──────────┐    SELECT * FROM      ┌──────────┐

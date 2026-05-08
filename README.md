@@ -50,6 +50,16 @@ app/
 
 ## The database (`app/database.py`)
 
+This file uses **SQLAlchemy**, which is an ORM (Object-Relational Mapper). Instead of writing raw SQL like `INSERT INTO weather (date, temp_c, humidity) VALUES ('2026-01-01', 3.0, 78.0)`, you work with Python objects:
+
+```python
+row = Weather(date="2026-01-01", temp_c=3.0, humidity=78.0)
+db.add(row)
+db.commit()
+```
+
+SQLAlchemy translates that into SQL for you. It also handles connecting to the database, creating tables, and querying data — all from Python.
+
 This file sets up three things:
 
 **1. The connection** — points SQLAlchemy at a SQLite file (`weather.db`).
